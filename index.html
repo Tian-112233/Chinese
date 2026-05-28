@@ -303,6 +303,9 @@ async function loadSharePage(token) {
     return;
   }
 
+  // 存全局，让 previewFile 在分享页也能构造 /preview/ URL
+  window.shareWorkerUrl = workerUrl;
+
   try {
     const res = await fetch(`${workerUrl}/share/${realToken}`);
     if (!res.ok) { body.innerHTML = `<div style="text-align:center;padding:60px;color:red">${await res.text()}</div>`; return; }
@@ -319,8 +322,8 @@ async function loadSharePage(token) {
             <div class="share-file-meta">${fmtSize(data.size)}</div>
           </div>
           <div class="share-file-actions">
-            ${isAudio(data.name)?`<button class="share-preview-btn" onclick="sharePlayAudio('${ea(data.url)}','${ea(data.name)}')">▶ 播放</button>`:''}
-            ${isPPT(data.name)?`<button class="share-preview-btn" onclick="window.open('https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent('${ea(data.url)}'),'_blank')">👁 预览</button>`:''}
+            ${isAudio(data.name)?`<button class="share-preview-btn" onclick="previewFile('${ea(data.url)}','${ea(data.name)}','${ea(data.key||data.name)}')">▶ 播放</button>`:''}
+            ${!isAudio(data.name)?`<button class="share-preview-btn" onclick="previewFile('${ea(data.url)}','${ea(data.name)}','${ea(data.key||data.name)}')">👁 预览</button>`:''}
             <button class="share-dl-btn" onclick="dlFile('${ea(data.url)}','${ea(data.name)}')">⬇ 下载</button>
           </div>
         </div>`;
@@ -331,9 +334,8 @@ async function loadSharePage(token) {
           <div class="share-row-name" title="${f.name}">${f.name}</div>
           <div class="share-row-size">${fmtSize(f.size)}</div>
           <div class="share-row-btn">
-            ${isAudio(f.name)?`<button class="share-row-dl" onclick="sharePlayAudio('${ea(f.url)}','${ea(f.name)}')">▶ 播放</button>`:''}
-            ${isPPT(f.name)?`<button class="share-row-dl" onclick="window.open('https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent('${ea(f.url)}'),'_blank')">👁 预览</button>`:''}
-            ${!isAudio(f.name)&&!isPPT(f.name)?`<button class="share-row-dl" onclick="previewFile('${ea(f.url)}','${ea(f.name)}')">👁 预览</button>`:''}
+            ${isAudio(f.name)?`<button class="share-row-dl" onclick="previewFile('${ea(f.url)}','${ea(f.name)}','${ea(f.key)}')">▶ 播放</button>`:''}
+            ${!isAudio(f.name)?`<button class="share-row-dl" onclick="previewFile('${ea(f.url)}','${ea(f.name)}','${ea(f.key)}')">👁 预览</button>`:''}
             <button class="share-row-dl" onclick="dlFile('${ea(f.url)}','${ea(f.name)}')">⬇ 下载</button>
           </div>
         </div>`).join('');
@@ -438,9 +440,9 @@ function renderFiles(query='') {
       <div class="meta-cell">${isF?'文件夹':fmtSize(f.size)}</div>
       <div class="meta-cell">${isF?'':fmtDate(f.uploaded)}</div>
       <div class="action-group" onclick="event.stopPropagation()">
-        ${audio?`<button class="action-btn" onclick="playAudio('${ea(f.url)}','${ea(dName)}')">▶ 播放</button>`:''}
-        ${!isF&&isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}')">👁 预览</button>`:''}
-        ${!isF&&!audio&&!isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}')">👁 预览</button>`:''}
+        ${audio?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}','${ea(fullKey)}')">▶ 播放</button>`:''}
+        ${!isF&&isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}','${ea(fullKey)}')">👁 预览</button>`:''}
+        ${!isF&&!audio&&!isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}','${ea(fullKey)}')">👁 预览</button>`:''}
         ${!isF?`<button class="action-btn" onclick="dlFile('${ea(f.url)}','${ea(dName)}')">下载</button>`:''}
         <button class="action-btn share-btn" onclick="doShare('${ea(fullKey)}','${isF}','${ea(dName.replace(/\/$/, ''))}')">🔗 分享</button>
         <button class="action-btn" onclick="doRename('${ea(fullKey)}','${isF}')">改名</button>
@@ -466,20 +468,34 @@ function isImage(n) { return ['jpg','jpeg','png','gif','webp','svg'].includes((n
 function isVideo(n) { return ['mp4','webm','mov'].includes((n.split('.').pop()||'').toLowerCase()); }
 function isPDF(n)   { return (n.split('.').pop()||'').toLowerCase() === 'pdf'; }
 
+// 把 R2 直链转换为 Worker 的 /preview/ 接口（强制 inline，手机可直接打开）
+function toPreviewUrl(url, key) {
+  // url 是 R2 公开直链，key 是文件在 bucket 的路径
+  // 分享页拿不到 CFG.worker，所以从 url 中提取 key 传给 worker
+  if (CFG && CFG.worker) {
+    return CFG.worker + '/preview/' + encodeURIComponent(key || url.split('/').pop());
+  }
+  // 分享页：workerUrl 从全局 shareWorkerUrl 取
+  if (typeof shareWorkerUrl !== 'undefined' && shareWorkerUrl) {
+    return shareWorkerUrl + '/preview/' + encodeURIComponent(key || url.split('/').pop());
+  }
+  return url;
+}
+
 // 根据文件类型选择最佳预览方式
-function previewFile(url, name) {
-  const ext = (name.split('.').pop()||'').toLowerCase();
+function previewFile(url, name, key) {
   if (isPPT(name)) {
-    // Office 文件用微软在线预览
+    // Office 文件用微软在线预览（需要公开直链）
     window.open('https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url), '_blank');
   } else if (isAudio(name)) {
-    // 音频用迷你播放器
-    playAudio(url, name);
+    // 音频用迷你播放器，走 /preview/ 保证能播
+    const pUrl = toPreviewUrl(url, key);
+    playAudio(pUrl, name);
   } else if (isImage(name) || isVideo(name) || isPDF(name)) {
-    // 图片/视频/PDF 直接在新标签打开（手机浏览器原生支持）
-    window.open(url, '_blank');
+    // 图片/视频/PDF 走 /preview/ 强制 inline
+    window.open(toPreviewUrl(url, key), '_blank');
   } else {
-    // 其他文件尝试直接打开
+    // 其他：尝试直接打开
     window.open(url, '_blank');
   }
 }
