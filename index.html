@@ -151,12 +151,12 @@
     .share-dl-btn{background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:10px 20px;cursor:pointer;font-weight:700;font-size:13px;font-family:'Sora',sans-serif}
     .share-preview-btn{background:transparent;border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;cursor:pointer;font-size:13px;font-family:'Sora',sans-serif}
     .share-folder-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-    .share-row{display:grid;grid-template-columns:40px 1fr 90px 120px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center}
+    .share-row{display:grid;grid-template-columns:40px 1fr 80px 200px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center}
     .share-row:last-child{border-bottom:none}
     .share-row:hover{background:var(--surface2)}
     .share-row-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .share-row-size{font-size:11px;color:var(--ink2);font-family:'JetBrains Mono',monospace}
-    .share-row-btn{text-align:right}
+    .share-row-btn{display:flex;gap:5px;justify-content:flex-end;flex-wrap:nowrap}
     .share-row-dl{background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:'Sora',sans-serif}
     .share-row-dl:hover{background:var(--ink);color:#fff}
   </style>
@@ -322,7 +322,9 @@ async function loadSharePage(token) {
           <div class="share-row-name" title="${f.name}">${f.name}</div>
           <div class="share-row-size">${fmtSize(f.size)}</div>
           <div class="share-row-btn">
-            ${isAudio(f.name)?`<button class="share-row-dl" onclick="sharePlayAudio('${ea(f.url)}','${ea(f.name)}')">▶</button> `:''}
+            ${isAudio(f.name)?`<button class="share-row-dl" onclick="sharePlayAudio('${ea(f.url)}','${ea(f.name)}')">▶ 播放</button>`:''}
+            ${isPPT(f.name)?`<button class="share-row-dl" onclick="window.open('https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent('${ea(f.url)}'),'_blank')">👁 预览</button>`:''}
+            ${!isAudio(f.name)&&!isPPT(f.name)?`<button class="share-row-dl" onclick="window.open('${ea(f.url)}','_blank')">👁 预览</button>`:''}
             <button class="share-row-dl" onclick="dlFile('${ea(f.url)}','${ea(f.name)}')">⬇ 下载</button>
           </div>
         </div>`).join('');
