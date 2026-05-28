@@ -54,11 +54,20 @@
 
     @media(max-width:900px){
       .table-head{display:none}
-      .file-row{grid-template-columns:40px 1fr;padding:16px;gap:6px 12px}
-      .file-name-cell{grid-column:2;font-weight:700;font-size:15px;word-break:break-all}
-      .meta-cell{grid-column:2;display:flex;gap:10px;flex-wrap:wrap}
-      .action-group{grid-column:1/span 2;justify-content:flex-start;margin-top:10px;flex-wrap:wrap;gap:6px}
-      .action-btn{flex:1;text-align:center;min-width:60px;padding:9px 4px}
+      .file-row{grid-template-columns:40px 1fr;padding:14px 16px;gap:4px 12px}
+      .file-name-cell{grid-column:2;font-weight:700;font-size:14px;word-break:break-all}
+      .meta-cell{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;font-size:11px}
+      .action-group{grid-column:1/span 2;display:grid;grid-template-columns:repeat(3,1fr);margin-top:8px;gap:5px}
+      .action-btn{text-align:center;padding:8px 4px;font-size:11px}
+      /* 分享页文件夹列表手机端 */
+      .share-row{grid-template-columns:32px 1fr !important}
+      .share-row-size{display:none}
+      .share-row-btn{grid-column:1/span 2;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:6px;padding-bottom:4px}
+      .share-row-dl{text-align:center;padding:8px 4px !important;font-size:12px !important}
+      /* 分享页单文件手机端 */
+      .share-file-card{flex-direction:column;align-items:flex-start !important}
+      .share-file-actions{flex-wrap:wrap;width:100%}
+      .share-dl-btn,.share-preview-btn{flex:1;text-align:center}
     }
 
     /* ══ 上传进度面板 ══ */
@@ -151,7 +160,7 @@
     .share-dl-btn{background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:10px 20px;cursor:pointer;font-weight:700;font-size:13px;font-family:'Sora',sans-serif}
     .share-preview-btn{background:transparent;border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;cursor:pointer;font-size:13px;font-family:'Sora',sans-serif}
     .share-folder-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-    .share-row{display:grid;grid-template-columns:40px 1fr 80px 200px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center}
+    .share-row{display:grid;grid-template-columns:40px 1fr 80px 200px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;gap:0}
     .share-row:last-child{border-bottom:none}
     .share-row:hover{background:var(--surface2)}
     .share-row-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
