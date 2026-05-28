@@ -333,7 +333,7 @@ async function loadSharePage(token) {
           <div class="share-row-btn">
             ${isAudio(f.name)?`<button class="share-row-dl" onclick="sharePlayAudio('${ea(f.url)}','${ea(f.name)}')">▶ 播放</button>`:''}
             ${isPPT(f.name)?`<button class="share-row-dl" onclick="window.open('https://view.officeapps.live.com/op/view.aspx?src='+encodeURIComponent('${ea(f.url)}'),'_blank')">👁 预览</button>`:''}
-            ${!isAudio(f.name)&&!isPPT(f.name)?`<button class="share-row-dl" onclick="window.open('${ea(f.url)}','_blank')">👁 预览</button>`:''}
+            ${!isAudio(f.name)&&!isPPT(f.name)?`<button class="share-row-dl" onclick="previewFile('${ea(f.url)}','${ea(f.name)}')">👁 预览</button>`:''}
             <button class="share-row-dl" onclick="dlFile('${ea(f.url)}','${ea(f.name)}')">⬇ 下载</button>
           </div>
         </div>`).join('');
@@ -440,7 +440,7 @@ function renderFiles(query='') {
       <div class="action-group" onclick="event.stopPropagation()">
         ${audio?`<button class="action-btn" onclick="playAudio('${ea(f.url)}','${ea(dName)}')">▶ 播放</button>`:''}
         ${!isF&&isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}')">👁 预览</button>`:''}
-        ${!isF&&!audio&&!isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}')">预览</button>`:''}
+        ${!isF&&!audio&&!isPPT(dName)?`<button class="action-btn" onclick="previewFile('${ea(f.url)}','${ea(dName)}')">👁 预览</button>`:''}
         ${!isF?`<button class="action-btn" onclick="dlFile('${ea(f.url)}','${ea(dName)}')">下载</button>`:''}
         <button class="action-btn share-btn" onclick="doShare('${ea(fullKey)}','${isF}','${ea(dName.replace(/\/$/, ''))}')">🔗 分享</button>
         <button class="action-btn" onclick="doRename('${ea(fullKey)}','${isF}')">改名</button>
@@ -462,9 +462,26 @@ function getIcon(n) {
   if(['pdf'].includes(e)) return '📄';
   return '📝';
 }
+function isImage(n) { return ['jpg','jpeg','png','gif','webp','svg'].includes((n.split('.').pop()||'').toLowerCase()); }
+function isVideo(n) { return ['mp4','webm','mov'].includes((n.split('.').pop()||'').toLowerCase()); }
+function isPDF(n)   { return (n.split('.').pop()||'').toLowerCase() === 'pdf'; }
+
+// 根据文件类型选择最佳预览方式
 function previewFile(url, name) {
-  if (isPPT(name)) { window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`, '_blank'); }
-  else { window.open(url, '_blank'); }
+  const ext = (name.split('.').pop()||'').toLowerCase();
+  if (isPPT(name)) {
+    // Office 文件用微软在线预览
+    window.open('https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url), '_blank');
+  } else if (isAudio(name)) {
+    // 音频用迷你播放器
+    playAudio(url, name);
+  } else if (isImage(name) || isVideo(name) || isPDF(name)) {
+    // 图片/视频/PDF 直接在新标签打开（手机浏览器原生支持）
+    window.open(url, '_blank');
+  } else {
+    // 其他文件尝试直接打开
+    window.open(url, '_blank');
+  }
 }
 function dlFile(url, name) {
   const a = document.createElement('a'); a.href=url; a.download=name; a.target='_blank';
