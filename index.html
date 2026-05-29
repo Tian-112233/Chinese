@@ -431,6 +431,8 @@ function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   refreshFiles();
+  // 后台预加载所有音频列表
+  setTimeout(loadAllAudio, 1500);
 }
 
 function ah(extra) { return { 'X-Auth-Key': CFG.key, ...extra }; }
@@ -829,12 +831,11 @@ async function togglePlaylist() {
   playlistOpen = !playlistOpen;
   const pl = document.getElementById('mp-playlist');
   if (playlistOpen) {
-    // 如果全局列表为空，先拉一次当前目录
-    if (globalAudioList.length === 0) {
-      syncAudioList();
-    }
-    renderPlaylist();
+    const items = document.getElementById('mp-playlist-items');
+    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.4);text-align:center">加载中...</div>';
     pl.classList.add('open');
+    await loadAllAudio();
+    renderPlaylist();
   } else {
     pl.classList.remove('open');
   }
@@ -845,11 +846,12 @@ function closePlaylist() {
   document.getElementById('mp-playlist').classList.remove('open');
 }
 
-// 全局音频列表（跨目录）
+// 全局音频列表（递归拉取所有目录）
 let globalAudioList = [];
+let audioListLoaded = false;
 
-// 播放一个音频时，同步更新全局列表（把当前目录音频合并进去）
 function syncAudioList() {
+  // 把当前目录的音频文件合并进全局列表
   const cur = allFiles.filter(f => !f.isFolder && isAudio(dn(f)));
   cur.forEach(f => {
     const key = f.previewUrl || f.url;
@@ -857,6 +859,28 @@ function syncAudioList() {
       globalAudioList.push(f);
     }
   });
+}
+
+// 递归拉取所有音频（调用 /list-all 接口）
+async function loadAllAudio() {
+  if (audioListLoaded) return;
+  try {
+    const res = await fetch(`${CFG.worker}/list-all?prefix=`, { headers: ah() });
+    const all = await res.json();
+    const audioExts = ['mp3','wav','m4a','ogg','flac','aac','opus','wma'];
+    globalAudioList = all
+      .filter(f => audioExts.includes((f.name.split('.').pop()||'').toLowerCase()))
+      .map(f => ({
+        name: f.name,
+        size: f.size,
+        isFolder: false,
+        url: `${CFG.worker}/preview/${f.name}`,
+        previewUrl: `${CFG.worker}/preview/${f.name}`,
+      }));
+    audioListLoaded = true;
+  } catch(e) {
+    console.log('loadAllAudio error', e);
+  }
 }
 
 function getAudioFiles() {
@@ -886,14 +910,16 @@ function renderPlaylist() {
 }
 
 // 自动播放下一首
-function playNext() {
+async function playNext() {
+  await loadAllAudio();
   const audioFiles = getAudioFiles();
   if (!audioFiles.length) return;
   const idx = audioFiles.findIndex(f => (f.previewUrl||f.url) === currentAudioUrl);
   const next = audioFiles[(idx + 1) % audioFiles.length];
   if (next) {
-    const name = next.name.slice(currentPrefix.length);
-    playAudio(next.previewUrl || next.url, name);
+    const parts = next.name.split('/');
+    const fname = parts[parts.length - 1];
+    playAudio(next.previewUrl || next.url, fname);
   }
 }
 
