@@ -848,7 +848,6 @@ function closePlaylist() {
 
 // 全局音频列表（递归拉取所有目录）
 let globalAudioList = [];
-let audioListLoaded = false;
 
 function syncAudioList() {
   // 把当前目录的音频文件合并进全局列表
@@ -862,25 +861,28 @@ function syncAudioList() {
 }
 
 // 递归拉取所有音频（调用 /list-all 接口）
+let _loadAudioPromise = null;
 async function loadAllAudio() {
-  if (audioListLoaded) return;
-  try {
-    const res = await fetch(`${CFG.worker}/list-all?prefix=`, { headers: ah() });
-    const all = await res.json();
-    const audioExts = ['mp3','wav','m4a','ogg','flac','aac','opus','wma'];
-    globalAudioList = all
-      .filter(f => audioExts.includes((f.name.split('.').pop()||'').toLowerCase()))
-      .map(f => ({
-        name: f.name,
-        size: f.size,
-        isFolder: false,
-        url: `${CFG.worker}/preview/${f.name}`,
-        previewUrl: `${CFG.worker}/preview/${f.name}`,
-      }));
-    audioListLoaded = true;
-  } catch(e) {
-    console.log('loadAllAudio error', e);
-  }
+  if (_loadAudioPromise) return _loadAudioPromise;
+  _loadAudioPromise = (async () => {
+    try {
+      const res = await fetch(`${CFG.worker}/list-all?prefix=`, { headers: ah() });
+      const all = await res.json();
+      const audioExts = ['mp3','wav','m4a','ogg','flac','aac','opus','wma'];
+      globalAudioList = all
+        .filter(f => audioExts.includes((f.name.split('.').pop()||'').toLowerCase()))
+        .map(f => ({
+          name: f.name,
+          size: f.size,
+          isFolder: false,
+          url: `${CFG.worker}/preview/${f.name}`,
+          previewUrl: `${CFG.worker}/preview/${f.name}`,
+        }));
+    } catch(e) {
+      console.log('loadAllAudio error', e);
+    }
+  })();
+  return _loadAudioPromise;
 }
 
 function getAudioFiles() {
@@ -896,15 +898,19 @@ function renderPlaylist() {
     return;
   }
   items.innerHTML = audioFiles.map(f => {
-    // 取文件名部分显示（去掉目录前缀）
     const parts = f.name.split('/');
     const fname = parts[parts.length - 1];
+    // 显示上级目录名方便识别
+    const dirname = parts.length > 1 ? parts[parts.length - 2] : '';
     const pu = f.previewUrl || f.url;
     const isPlaying = pu === currentAudioUrl;
     return `<div class="mp-playlist-item${isPlaying?' playing':''}" onclick="playAudio('${ea(pu)}','${ea(fname)}');closePlaylist()">
       <div class="mp-playlist-item-icon">${isPlaying && !audio.paused ? '▶' : '🎵'}</div>
-      <div class="mp-playlist-item-name" title="${ea(f.name)}">${fname}</div>
-      ${isPlaying ? '<div class="mp-playlist-item-playing">▶ 播放中</div>' : ''}
+      <div style="flex:1;min-width:0">
+        <div class="mp-playlist-item-name" title="${ea(f.name)}">${fname}</div>
+        ${dirname?`<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:1px">${dirname}</div>`:''}
+      </div>
+      ${isPlaying ? '<div class="mp-playlist-item-playing">▶</div>' : ''}
     </div>`;
   }).join('');
 }
