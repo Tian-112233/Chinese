@@ -453,7 +453,7 @@ async function listAllUnder(prefix) {
 async function refreshFiles() {
   document.getElementById('file-list').innerHTML = '<div style="padding:40px;text-align:center;color:#999">同步中...</div>';
   updateBread();
-  try { allFiles = await apiList(currentPrefix); renderFiles(); }
+  try { allFiles = await apiList(currentPrefix); renderFiles(); syncAudioList(); }
   catch(e) { document.getElementById('file-list').innerHTML = '<div style="padding:40px;text-align:center;color:red">连接失败</div>'; }
 }
 
@@ -777,7 +777,8 @@ function playAudio(url, name) {
   document.getElementById('mp-title').textContent = name;
   player.classList.add('visible');
   updatePlayBtn();
-  renderPlaylist(); // 刷新列表高亮
+  syncAudioList();
+  renderPlaylist();
 }
 
 function togglePlay() {
@@ -824,10 +825,14 @@ audio.addEventListener('ended', () => {
 });
 
 // ── 播放列表 ──
-function togglePlaylist() {
+async function togglePlaylist() {
   playlistOpen = !playlistOpen;
   const pl = document.getElementById('mp-playlist');
   if (playlistOpen) {
+    // 如果全局列表为空，先拉一次当前目录
+    if (globalAudioList.length === 0) {
+      syncAudioList();
+    }
     renderPlaylist();
     pl.classList.add('open');
   } else {
@@ -840,9 +845,23 @@ function closePlaylist() {
   document.getElementById('mp-playlist').classList.remove('open');
 }
 
-// 从当前 allFiles 里取音频文件
+// 全局音频列表（跨目录）
+let globalAudioList = [];
+
+// 播放一个音频时，同步更新全局列表（把当前目录音频合并进去）
+function syncAudioList() {
+  const cur = allFiles.filter(f => !f.isFolder && isAudio(dn(f)));
+  cur.forEach(f => {
+    const key = f.previewUrl || f.url;
+    if (!globalAudioList.find(x => (x.previewUrl||x.url) === key)) {
+      globalAudioList.push(f);
+    }
+  });
+}
+
 function getAudioFiles() {
-  return allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
+  syncAudioList();
+  return globalAudioList;
 }
 
 function renderPlaylist() {
@@ -853,13 +872,15 @@ function renderPlaylist() {
     return;
   }
   items.innerHTML = audioFiles.map(f => {
-    const name = f.name.slice(currentPrefix.length);
+    // 取文件名部分显示（去掉目录前缀）
+    const parts = f.name.split('/');
+    const fname = parts[parts.length - 1];
     const pu = f.previewUrl || f.url;
-    const isPlaying = f.previewUrl === currentAudioUrl || f.url === currentAudioUrl;
-    return `<div class="mp-playlist-item${isPlaying?' playing':''}" onclick="playAudio('${ea(pu)}','${ea(name)}');closePlaylist()">
+    const isPlaying = pu === currentAudioUrl;
+    return `<div class="mp-playlist-item${isPlaying?' playing':''}" onclick="playAudio('${ea(pu)}','${ea(fname)}');closePlaylist()">
       <div class="mp-playlist-item-icon">${isPlaying && !audio.paused ? '▶' : '🎵'}</div>
-      <div class="mp-playlist-item-name" title="${ea(name)}">${name}</div>
-      ${isPlaying ? '<div class="mp-playlist-item-playing">播放中</div>' : ''}
+      <div class="mp-playlist-item-name" title="${ea(f.name)}">${fname}</div>
+      ${isPlaying ? '<div class="mp-playlist-item-playing">▶ 播放中</div>' : ''}
     </div>`;
   }).join('');
 }
