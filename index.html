@@ -104,7 +104,7 @@
       color:#fff;
       border-radius:40px;
       box-shadow:0 4px 20px rgba(0,0,0,.3);
-      z-index:300;
+      z-index:700;
       display:none;
       align-items:center;
       gap:8px;
@@ -551,13 +551,16 @@ async function renderPdf(url, container) {
       // 根据容器宽度自适应缩放
       const containerW = container.clientWidth - 24;
       const viewport0 = page.getViewport({ scale: 1 });
-      const scale = containerW / viewport0.width;
+      // 用 devicePixelRatio 提升清晰度，Retina/高分屏效果更好
+      const dpr = window.devicePixelRatio || 1;
+      const scale = (containerW / viewport0.width) * dpr;
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      canvas.style.cssText = 'display:block;margin:0 auto 12px;border-radius:4px;max-width:100%';
+      // CSS 尺寸按实际显示大小，canvas 内部按高分辨率
+      canvas.style.cssText = `display:block;margin:0 auto 12px;border-radius:4px;width:${Math.floor(viewport.width/dpr)}px;max-width:100%`;
 
       const ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport }).promise;
