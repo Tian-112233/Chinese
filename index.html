@@ -267,6 +267,15 @@
 <div id="toast"></div>
 <audio id="bg-audio" style="display:none"></audio>
 
+<!-- ══ 内嵌预览弹窗 ══ -->
+<div id="preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:600;flex-direction:column;align-items:stretch">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#111;flex-shrink:0">
+    <div id="preview-title" style="color:#fff;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%"></div>
+    <button onclick="closePreview()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;flex-shrink:0">✕ 关闭</button>
+  </div>
+  <div id="preview-body" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:12px"></div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
 // 分享页面检测（URL hash = #share/TOKEN）
@@ -468,18 +477,49 @@ function isImage(n) { return ['jpg','jpeg','png','gif','webp','svg'].includes((n
 function isVideo(n) { return ['mp4','webm','mov'].includes((n.split('.').pop()||'').toLowerCase()); }
 function isPDF(n)   { return (n.split('.').pop()||'').toLowerCase() === 'pdf'; }
 
-// previewUrl = worker 返回的 /preview/<key> 地址，强制 inline
-// url        = R2 直链，用于 Office 在线预览和下载
+// 页面内嵌预览弹窗
 function previewFile(url, name, previewUrl) {
   const pu = previewUrl || url;
+  const ext = (name.split('.').pop() || '').toLowerCase();
+
   if (isPPT(name)) {
+    // Office 文件用微软在线预览
     window.open('https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url), '_blank');
-  } else if (isAudio(name)) {
-    playAudio(pu, name);
-  } else {
-    // 图片、视频、PDF、其他 — 走 /preview/ inline 打开
-    window.open(pu, '_blank');
+    return;
   }
+
+  if (isAudio(name)) {
+    playAudio(pu, name);
+    return;
+  }
+
+  // 构建内嵌预览内容
+  let inner = '';
+  if (isImage(name)) {
+    inner = `<img src="${pu}" style="max-width:100%;max-height:80vh;display:block;margin:auto;border-radius:4px">`;
+  } else if (isVideo(name)) {
+    inner = `<video src="${pu}" controls autoplay style="max-width:100%;max-height:80vh;display:block;margin:auto" playsinline></video>`;
+  } else if (isPDF(name)) {
+    inner = `<iframe src="${pu}" style="width:100%;height:78vh;border:none;border-radius:4px"></iframe>`;
+  } else {
+    // 其他文件直接新标签打开
+    window.open(pu, '_blank');
+    return;
+  }
+
+  // 显示弹窗
+  const overlay = document.getElementById('preview-overlay');
+  const box = document.getElementById('preview-box');
+  const title = document.getElementById('preview-title');
+  const body = document.getElementById('preview-body');
+  title.textContent = name;
+  body.innerHTML = inner;
+  overlay.style.display = 'flex';
+}
+
+function closePreview() {
+  document.getElementById('preview-overlay').style.display = 'none';
+  document.getElementById('preview-body').innerHTML = '';
 }
 function dlFile(url, name) {
   const a = document.createElement('a'); a.href=url; a.download=name; a.target='_blank';
