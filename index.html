@@ -885,16 +885,11 @@ async function loadAllAudio() {
   return _loadAudioPromise;
 }
 
-function getAudioFiles() {
-  syncAudioList();
-  return globalAudioList;
-}
-
 function renderPlaylist() {
   const items = document.getElementById('mp-playlist-items');
-  const audioFiles = getAudioFiles();
+  const audioFiles = globalAudioList;
   if (!audioFiles.length) {
-    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.3);text-align:center">当前目录无音频文件</div>';
+    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.4);text-align:center">加载中，请稍候...</div>';
     return;
   }
   items.innerHTML = audioFiles.map(f => {
@@ -918,7 +913,7 @@ function renderPlaylist() {
 // 自动播放下一首
 async function playNext() {
   await loadAllAudio();
-  const audioFiles = getAudioFiles();
+  const audioFiles = globalAudioList;
   if (!audioFiles.length) return;
   const idx = audioFiles.findIndex(f => (f.previewUrl||f.url) === currentAudioUrl);
   const next = audioFiles[(idx + 1) % audioFiles.length];
