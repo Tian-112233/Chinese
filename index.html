@@ -494,27 +494,94 @@ function previewFile(url, name, previewUrl) {
   }
 
   // 构建内嵌预览内容
-  let inner = '';
-  if (isImage(name)) {
-    inner = `<img src="${pu}" style="max-width:100%;max-height:80vh;display:block;margin:auto;border-radius:4px">`;
-  } else if (isVideo(name)) {
-    inner = `<video src="${pu}" controls autoplay style="max-width:100%;max-height:80vh;display:block;margin:auto" playsinline></video>`;
-  } else if (isPDF(name)) {
-    inner = `<iframe src="${pu}" style="width:100%;height:78vh;border:none;border-radius:4px"></iframe>`;
-  } else {
-    // 其他文件直接新标签打开
-    window.open(pu, '_blank');
-    return;
-  }
-
-  // 显示弹窗
   const overlay = document.getElementById('preview-overlay');
-  const box = document.getElementById('preview-box');
   const title = document.getElementById('preview-title');
   const body = document.getElementById('preview-body');
   title.textContent = name;
-  body.innerHTML = inner;
+  body.innerHTML = '';
   overlay.style.display = 'flex';
+
+  if (isImage(name)) {
+    body.innerHTML = `<img src="${pu}" style="max-width:100%;max-height:80vh;display:block;margin:auto;border-radius:4px">`;
+  } else if (isVideo(name)) {
+    body.innerHTML = `<video src="${pu}" controls autoplay playsinline style="max-width:100%;max-height:80vh;display:block;margin:auto"></video>`;
+  } else if (isPDF(name)) {
+    // 用 PDF.js 渲染，手机全兼容
+    body.innerHTML = '<div style="color:#fff;font-size:13px;padding:20px">正在加载 PDF...</div>';
+    loadPdfJs(pu, body);
+  } else {
+    body.innerHTML = '';
+    overlay.style.display = 'none';
+    window.open(pu, '_blank');
+  }
+}
+
+// ── PDF.js 渲染 ──
+let pdfJsLoaded = false;
+
+function loadPdfJs(url, container) {
+  if (!pdfJsLoaded) {
+    // 动态加载 PDF.js
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+    script.type = 'module';
+    script.onload = () => { pdfJsLoaded = true; };
+    document.head.appendChild(script);
+  }
+  // 用 fetch 拿 PDF 二进制，再用 PDF.js 渲染
+  renderPdf(url, container);
+}
+
+async function renderPdf(url, container) {
+  try {
+    // 动态 import PDF.js（ES module）
+    const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const total = pdf.numPages;
+
+    container.innerHTML = '';
+    container.style.cssText = 'flex:1;overflow-y:auto;display:block;padding:12px;background:#1a1a1a';
+
+    for (let i = 1; i <= total; i++) {
+      const page = await pdf.getPage(i);
+      // 根据容器宽度自适应缩放
+      const containerW = container.clientWidth - 24;
+      const viewport0 = page.getViewport({ scale: 1 });
+      const scale = containerW / viewport0.width;
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.cssText = 'display:block;margin:0 auto 12px;border-radius:4px;max-width:100%';
+
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      container.appendChild(canvas);
+
+      // 第一页渲染完先显示，其余后台继续
+      if (i === 1) {
+        const tip = document.createElement('div');
+        tip.id = 'pdf-progress';
+        tip.style.cssText = 'text-align:center;color:rgba(255,255,255,0.5);font-size:12px;padding:8px;font-family:monospace';
+        tip.textContent = `第 1/${total} 页，加载中...`;
+        container.insertBefore(tip, canvas);
+      } else {
+        const tip = document.getElementById('pdf-progress');
+        if (tip) tip.textContent = `已加载 ${i}/${total} 页`;
+        if (i === total && tip) tip.textContent = `共 ${total} 页`;
+      }
+    }
+  } catch(e) {
+    container.innerHTML = `<div style="color:#f88;padding:24px;text-align:center;font-size:14px">
+      PDF 加载失败: ${e.message}<br><br>
+      <a href="${url}" target="_blank" style="color:#7ab8e8">点击下载查看</a>
+    </div>`;
+  }
 }
 
 function closePreview() {
