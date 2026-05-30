@@ -278,7 +278,8 @@
   <div class="mp-title" id="mp-title">未播放</div>
   <input type="range" id="mp-seek" min="0" max="1000" value="0" step="1"
     style="width:60px;height:3px;cursor:pointer;accent-color:#fff;background:rgba(255,255,255,.2);border-radius:3px;outline:none;-webkit-appearance:none;appearance:none;flex-shrink:0"
-    oninput="seekByRange(this.value)" ontouchstart="event.stopPropagation()">
+    onmousedown="seekStart()" ontouchstart="seekStart();event.stopPropagation()"
+    onchange="seekEnd(this.value)" oninput="seekPreview(this.value)">
   <div class="mp-time" id="mp-sub">0:00</div>
   <button class="mp-btn list-btn" onclick="event.stopPropagation();togglePlaylist()" title="切换音频">☰</button>
   <button class="mp-btn" id="mp-play-btn" onclick="togglePlay()">▶</button>
@@ -800,8 +801,25 @@ function closePlayer() {
   closePlaylist();
 }
 
-function seekByRange(val) {
-  if (audio.duration) audio.currentTime = (val / 1000) * audio.duration;
+let isSeeking = false;
+
+function seekStart() {
+  isSeeking = true;
+}
+
+function seekPreview(val) {
+  // 拖动过程中只更新时间显示，不跳转
+  if (audio.duration) {
+    const t = (val / 1000) * audio.duration;
+    document.getElementById('mp-sub').textContent = fmtTime(t) + ' / ' + fmtTime(audio.duration);
+  }
+}
+
+function seekEnd(val) {
+  if (audio.duration) {
+    audio.currentTime = (val / 1000) * audio.duration;
+  }
+  isSeeking = false;
 }
 
 function fmtTime(s) {
@@ -811,24 +829,22 @@ function fmtTime(s) {
 }
 
 audio.addEventListener('timeupdate', () => {
+  if (isSeeking) return; // 拖动中不更新滑块
   if (audio.duration) {
-    const val = (audio.currentTime / audio.duration) * 1000;
-    const seek = document.getElementById('mp-seek');
-    // 只在用户没有拖动时更新（避免冲突）
-    if (seek && document.activeElement !== seek) {
-      seek.value = val;
-    }
+    document.getElementById('mp-seek').value = (audio.currentTime / audio.duration) * 1000;
   }
-  document.getElementById('mp-sub').textContent = fmtTime(audio.currentTime)+' / '+fmtTime(audio.duration);
+  document.getElementById('mp-sub').textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
 });
 audio.addEventListener('play', updatePlayBtn);
 audio.addEventListener('pause', updatePlayBtn);
 audio.addEventListener('ended', () => {
   updatePlayBtn();
   document.getElementById('mp-sub').textContent = '已结束';
-  // 自动播放下一首
   playNext();
 });
+
+document.addEventListener('mouseup', () => { isSeeking = false; });
+document.addEventListener('touchend', () => { isSeeking = false; });
 
 // ── 播放列表 ──
 function togglePlaylist() {
