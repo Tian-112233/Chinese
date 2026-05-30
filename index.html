@@ -276,10 +276,12 @@
 <div id="mini-player">
   <div class="mp-icon">🎵</div>
   <div class="mp-title" id="mp-title">未播放</div>
-  <input type="range" id="mp-seek" min="0" max="1000" value="0" step="1"
-    style="width:60px;height:3px;cursor:pointer;accent-color:#fff;background:rgba(255,255,255,.2);border-radius:3px;outline:none;-webkit-appearance:none;appearance:none;flex-shrink:0"
-    onmousedown="seekStart()" ontouchstart="seekStart();event.stopPropagation()"
-    onchange="seekEnd(this.value)" oninput="seekPreview(this.value)">
+  <div id="mp-seek-wrap" style="width:64px;height:20px;display:flex;align-items:center;flex-shrink:0;cursor:pointer;touch-action:none" onpointerdown="seekPointerDown(event)">
+    <div style="width:100%;height:3px;background:rgba(255,255,255,.2);border-radius:3px;position:relative">
+      <div id="mp-progress-fill" style="height:100%;background:#fff;border-radius:3px;width:0%;pointer-events:none"></div>
+      <div id="mp-thumb" style="position:absolute;top:50%;right:0;transform:translate(50%,-50%);width:10px;height:10px;background:#fff;border-radius:50%;pointer-events:none"></div>
+    </div>
+  </div>
   <div class="mp-time" id="mp-sub">0:00</div>
   <button class="mp-btn list-btn" onclick="event.stopPropagation();togglePlaylist()" title="切换音频">☰</button>
   <button class="mp-btn" id="mp-play-btn" onclick="togglePlay()">▶</button>
@@ -803,22 +805,34 @@ function closePlayer() {
 
 let isSeeking = false;
 
-function seekStart() {
+function seekPointerDown(e) {
+  e.preventDefault();
   isSeeking = true;
+  seekMove(e);
+  document.addEventListener('pointermove', seekMove);
+  document.addEventListener('pointerup', seekPointerUp);
 }
 
-function seekPreview(val) {
-  // 拖动过程中只更新时间显示，不跳转
+function seekMove(e) {
+  const wrap = document.getElementById('mp-seek-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  // 更新视觉
+  document.getElementById('mp-progress-fill').style.width = (pct * 100) + '%';
+  document.getElementById('mp-thumb').style.left = (pct * 100) + '%';
+  // 更新时间显示
   if (audio.duration) {
-    const t = (val / 1000) * audio.duration;
-    document.getElementById('mp-sub').textContent = fmtTime(t) + ' / ' + fmtTime(audio.duration);
+    document.getElementById('mp-sub').textContent = fmtTime(pct * audio.duration) + ' / ' + fmtTime(audio.duration);
   }
 }
 
-function seekEnd(val) {
-  if (audio.duration) {
-    audio.currentTime = (val / 1000) * audio.duration;
-  }
+function seekPointerUp(e) {
+  document.removeEventListener('pointermove', seekMove);
+  document.removeEventListener('pointerup', seekPointerUp);
+  const wrap = document.getElementById('mp-seek-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  if (audio.duration) audio.currentTime = pct * audio.duration;
   isSeeking = false;
 }
 
@@ -829,9 +843,11 @@ function fmtTime(s) {
 }
 
 audio.addEventListener('timeupdate', () => {
-  if (isSeeking) return; // 拖动中不更新滑块
+  if (isSeeking) return;
   if (audio.duration) {
-    document.getElementById('mp-seek').value = (audio.currentTime / audio.duration) * 1000;
+    const pct = audio.currentTime / audio.duration * 100;
+    document.getElementById('mp-progress-fill').style.width = pct + '%';
+    document.getElementById('mp-thumb').style.left = pct + '%';
   }
   document.getElementById('mp-sub').textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
 });
@@ -843,8 +859,7 @@ audio.addEventListener('ended', () => {
   playNext();
 });
 
-document.addEventListener('mouseup', () => { isSeeking = false; });
-document.addEventListener('touchend', () => { isSeeking = false; });
+
 
 // ── 播放列表 ──
 function togglePlaylist() {
