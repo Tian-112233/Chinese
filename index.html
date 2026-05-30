@@ -116,8 +116,9 @@
     .mp-icon{font-size:14px;flex-shrink:0;opacity:.7}
     .mp-title{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;max-width:120px}
     .mp-time{font-size:10px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0}
-    .mp-progress-mini{width:44px;height:3px;background:rgba(255,255,255,.2);border-radius:3px;flex-shrink:0;cursor:pointer;position:relative}
-    .mp-progress-mini-fill{height:100%;background:#fff;border-radius:3px;width:0%;transition:width .1s linear}
+    /* range 滑块样式 */
+    #mp-seek::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 3px rgba(0,0,0,.4)}
+    #mp-seek::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;cursor:pointer;border:none}
     .mp-btn{background:none;border:none;color:#fff;cursor:pointer;font-size:15px;padding:3px 4px;opacity:.8;transition:opacity .15s;line-height:1;flex-shrink:0}
     .mp-btn:hover{opacity:1}
     .mp-btn.close-btn{font-size:12px;opacity:.4}
@@ -275,9 +276,9 @@
 <div id="mini-player">
   <div class="mp-icon">🎵</div>
   <div class="mp-title" id="mp-title">未播放</div>
-  <div class="mp-progress-mini" id="mp-progress-wrap" onclick="seekAudio(event)" title="点击跳转">
-    <div class="mp-progress-mini-fill" id="mp-progress-fill"></div>
-  </div>
+  <input type="range" id="mp-seek" min="0" max="1000" value="0" step="1"
+    style="width:60px;height:3px;cursor:pointer;accent-color:#fff;background:rgba(255,255,255,.2);border-radius:3px;outline:none;-webkit-appearance:none;appearance:none;flex-shrink:0"
+    oninput="seekByRange(this.value)" ontouchstart="event.stopPropagation()">
   <div class="mp-time" id="mp-sub">0:00</div>
   <button class="mp-btn list-btn" onclick="event.stopPropagation();togglePlaylist()" title="切换音频">☰</button>
   <button class="mp-btn" id="mp-play-btn" onclick="togglePlay()">▶</button>
@@ -799,11 +800,8 @@ function closePlayer() {
   closePlaylist();
 }
 
-function seekAudio(e) {
-  const wrap = document.getElementById('mp-progress-wrap');
-  const rect = wrap.getBoundingClientRect();
-  const pct = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
-  if (audio.duration) audio.currentTime = pct * audio.duration;
+function seekByRange(val) {
+  if (audio.duration) audio.currentTime = (val / 1000) * audio.duration;
 }
 
 function fmtTime(s) {
@@ -813,8 +811,14 @@ function fmtTime(s) {
 }
 
 audio.addEventListener('timeupdate', () => {
-  const pct = audio.duration ? audio.currentTime/audio.duration*100 : 0;
-  document.getElementById('mp-progress-fill').style.width = pct+'%';
+  if (audio.duration) {
+    const val = (audio.currentTime / audio.duration) * 1000;
+    const seek = document.getElementById('mp-seek');
+    // 只在用户没有拖动时更新（避免冲突）
+    if (seek && document.activeElement !== seek) {
+      seek.value = val;
+    }
+  }
   document.getElementById('mp-sub').textContent = fmtTime(audio.currentTime)+' / '+fmtTime(audio.duration);
 });
 audio.addEventListener('play', updatePlayBtn);
