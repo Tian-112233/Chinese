@@ -832,8 +832,26 @@ function seekPointerUp(e) {
   const wrap = document.getElementById('mp-seek-wrap');
   const rect = wrap.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  if (audio.duration) audio.currentTime = pct * audio.duration;
-  isSeeking = false;
+  if (audio.duration) {
+    const wasPlaying = !audio.paused;
+    audio.pause();
+    audio.currentTime = pct * audio.duration;
+    // 等缓冲好再继续播
+    const onReady = () => {
+      audio.removeEventListener('canplay', onReady);
+      if (wasPlaying) audio.play();
+      isSeeking = false;
+    };
+    audio.addEventListener('canplay', onReady);
+    // 超时保底：3秒后强制继续
+    setTimeout(() => {
+      audio.removeEventListener('canplay', onReady);
+      if (wasPlaying) audio.play();
+      isSeeking = false;
+    }, 3000);
+  } else {
+    isSeeking = false;
+  }
 }
 
 function fmtTime(s) {
