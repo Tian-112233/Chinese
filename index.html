@@ -279,7 +279,7 @@
     <div class="mp-progress-mini-fill" id="mp-progress-fill"></div>
   </div>
   <div class="mp-time" id="mp-sub">0:00</div>
-  <button class="mp-btn list-btn" onclick="togglePlaylist()" title="切换音频">☰</button>
+  <button class="mp-btn list-btn" onclick="event.stopPropagation();togglePlaylist()" title="切换音频">☰</button>
   <button class="mp-btn" id="mp-play-btn" onclick="togglePlay()">▶</button>
   <button class="mp-btn close-btn" onclick="closePlayer()" title="关闭">✕</button>
 </div>
@@ -926,9 +926,10 @@ async function playNext() {
 
 // 点击弹窗外关闭播放列表
 document.addEventListener('click', e => {
-  if (playlistOpen &&
-      !document.getElementById('mp-playlist').contains(e.target) &&
-      !e.target.classList.contains('list-btn')) {
+  if (!playlistOpen) return;
+  const pl = document.getElementById('mp-playlist');
+  const btn = e.target.closest('.list-btn');
+  if (!pl.contains(e.target) && !btn) {
     closePlaylist();
   }
 });
