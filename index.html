@@ -385,6 +385,9 @@ async function loadSharePage(token) {
           </div>
         </div>`;
     } else {
+      // 把音频文件存入分享页专用列表，供播放列表使用
+      window.shareAudioList = data.files.filter(f => isAudio(f.name));
+
       const rows = data.files.map(f => `
         <div class="share-row">
           <div style="font-size:18px">${getIcon(f.name)}</div>
@@ -937,14 +940,29 @@ async function loadAllAudio() {
 
 function renderPlaylist() {
   const items = document.getElementById('mp-playlist-items');
-  // 只显示当前目录的音频文件
-  const audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
+
+  // 分享页用 shareAudioList，主界面用 allFiles
+  let audioFiles;
+  if (window.shareAudioList) {
+    audioFiles = window.shareAudioList.map(f => ({
+      name: f.name,
+      previewUrl: f.previewUrl || f.url,
+      url: f.url,
+    }));
+  } else {
+    audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
+  }
+
   if (!audioFiles.length) {
     items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.3);text-align:center">当前目录无音频</div>';
     return;
   }
+
   items.innerHTML = audioFiles.map(f => {
-    const fname = f.name.slice(currentPrefix.length);
+    // 取文件名最后一段显示
+    const fname = window.shareAudioList
+      ? f.name  // 分享页：name 已经是去掉前缀的文件名
+      : f.name.slice(currentPrefix.length);
     const pu = f.previewUrl || f.url;
     const isPlaying = pu === currentAudioUrl;
     return `<div class="mp-playlist-item${isPlaying?' playing':''}" onclick="playAudio('${ea(pu)}','${ea(fname)}');closePlaylist()">
@@ -957,12 +975,17 @@ function renderPlaylist() {
 
 // 自动播放下一首
 function playNext() {
-  const audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
+  let audioFiles;
+  if (window.shareAudioList) {
+    audioFiles = window.shareAudioList.map(f => ({ name: f.name, previewUrl: f.previewUrl || f.url }));
+  } else {
+    audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
+  }
   if (!audioFiles.length) return;
   const idx = audioFiles.findIndex(f => (f.previewUrl||f.url) === currentAudioUrl);
   const next = audioFiles[(idx + 1) % audioFiles.length];
   if (next) {
-    const fname = next.name.slice(currentPrefix.length);
+    const fname = window.shareAudioList ? next.name : next.name.slice(currentPrefix.length);
     playAudio(next.previewUrl || next.url, fname);
   }
 }
