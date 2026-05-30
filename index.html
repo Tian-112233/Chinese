@@ -827,15 +827,12 @@ audio.addEventListener('ended', () => {
 });
 
 // ── 播放列表 ──
-async function togglePlaylist() {
+function togglePlaylist() {
   playlistOpen = !playlistOpen;
   const pl = document.getElementById('mp-playlist');
   if (playlistOpen) {
-    const items = document.getElementById('mp-playlist-items');
-    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.4);text-align:center">加载中...</div>';
-    pl.classList.add('open');
-    await loadAllAudio();
     renderPlaylist();
+    pl.classList.add('open');
   } else {
     pl.classList.remove('open');
   }
@@ -887,39 +884,32 @@ async function loadAllAudio() {
 
 function renderPlaylist() {
   const items = document.getElementById('mp-playlist-items');
-  const audioFiles = globalAudioList;
+  // 只显示当前目录的音频文件
+  const audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
   if (!audioFiles.length) {
-    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.4);text-align:center">加载中，请稍候...</div>';
+    items.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,.3);text-align:center">当前目录无音频</div>';
     return;
   }
   items.innerHTML = audioFiles.map(f => {
-    const parts = f.name.split('/');
-    const fname = parts[parts.length - 1];
-    // 显示上级目录名方便识别
-    const dirname = parts.length > 1 ? parts[parts.length - 2] : '';
+    const fname = f.name.slice(currentPrefix.length);
     const pu = f.previewUrl || f.url;
     const isPlaying = pu === currentAudioUrl;
     return `<div class="mp-playlist-item${isPlaying?' playing':''}" onclick="playAudio('${ea(pu)}','${ea(fname)}');closePlaylist()">
       <div class="mp-playlist-item-icon">${isPlaying && !audio.paused ? '▶' : '🎵'}</div>
-      <div style="flex:1;min-width:0">
-        <div class="mp-playlist-item-name" title="${ea(f.name)}">${fname}</div>
-        ${dirname?`<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:1px">${dirname}</div>`:''}
-      </div>
+      <div class="mp-playlist-item-name" title="${ea(fname)}">${fname}</div>
       ${isPlaying ? '<div class="mp-playlist-item-playing">▶</div>' : ''}
     </div>`;
   }).join('');
 }
 
 // 自动播放下一首
-async function playNext() {
-  await loadAllAudio();
-  const audioFiles = globalAudioList;
+function playNext() {
+  const audioFiles = allFiles.filter(f => !f.isFolder && isAudio(f.name.slice(currentPrefix.length)));
   if (!audioFiles.length) return;
   const idx = audioFiles.findIndex(f => (f.previewUrl||f.url) === currentAudioUrl);
   const next = audioFiles[(idx + 1) % audioFiles.length];
   if (next) {
-    const parts = next.name.split('/');
-    const fname = parts[parts.length - 1];
+    const fname = next.name.slice(currentPrefix.length);
     playAudio(next.previewUrl || next.url, fname);
   }
 }
